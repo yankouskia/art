@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ПОГОДА В СТОЛИЦАХ МИРА</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#e8f4f8;--card1:linear-gradient(135deg,#667eea,#764ba2);--card2:linear-gradient(135deg,#f093fb,#f5576c);--card3:linear-gradient(135deg,#4facfe,#00f2fe);--card4:linear-gradient(135deg,#43e97b,#38f9d7);--card5:linear-gradient(135deg,#fa709a,#fee140);--card6:linear-gradient(135deg,#a18cd1,#fbc2eb);--card7:linear-gradient(135deg,#fccb90,#d57eeb);--card8:linear-gradient(135deg,#e0c3fc,#8ec5fc);--shadow:0 8px 32px rgba(0,0,0,.12)}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);min-height:100vh;padding:16px;text-transform:uppercase}
+.header{text-align:center;padding:20px 0 12px}
+.header h1{font-size:1.6rem;color:#2d3748;letter-spacing:1px}
+.header p{color:#718096;font-size:.85rem;margin-top:4px}
+.search-wrap{max-width:480px;margin:12px auto 20px;position:relative}
+.search-wrap input{width:100%;padding:14px 20px;border:none;border-radius:16px;font-size:1rem;background:#fff;box-shadow:var(--shadow);outline:none;text-transform:uppercase;font-weight:600;color:#2d3748}
+.search-wrap input::placeholder{text-transform:uppercase;font-weight:400;color:#a0aec0}
+.autocomplete{position:absolute;top:100%;left:0;right:0;background:#fff;border-radius:0 0 16px 16px;box-shadow:var(--shadow);max-height:260px;overflow-y:auto;z-index:10;display:none}
+.autocomplete .item{padding:12px 20px;cursor:pointer;font-size:.9rem;font-weight:600;color:#2d3748;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:10px}
+.autocomplete .item:hover,.autocomplete .item.active{background:#f0f4ff}
+.autocomplete .item .flag{font-size:1.4rem}
+.autocomplete .item .info{display:flex;flex-direction:column}.autocomplete .item .info .cap{font-size:.75rem;color:#718096}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;max-width:900px;margin:0 auto;padding-bottom:80px}
+.card{border-radius:20px;padding:18px 16px;color:#fff;position:relative;box-shadow:var(--shadow);cursor:default;transition:transform .2s;min-height:180px;display:flex;flex-direction:column;justify-content:space-between}
+.card:hover{transform:translateY(-3px)}
+.card .flag{font-size:2.2rem}
+.card .country{font-size:.7rem;font-weight:700;opacity:.85;margin-top:6px;letter-spacing:.5px}
+.card .capital{font-size:1.05rem;font-weight:800;letter-spacing:.5px}
+.card .weather-icon{font-size:2rem;margin:6px 0 2px}
+.card .temp{font-size:1.5rem;font-weight:800}
+.card .condition{font-size:.65rem;font-weight:700;opacity:.85;letter-spacing:.3px}
+.card .remove{position:absolute;top:8px;right:10px;background:rgba(255,255,255,.25);border:none;color:#fff;width:26px;height:26px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+.card:hover .remove{opacity:1}
+.card .loading{opacity:.6;font-size:.75rem}
+.empty{text-align:center;color:#a0aec0;padding:60px 20px;font-size:.95rem;font-weight:600}
+@media(max-width:400px){.grid{grid-template-columns:repeat(2,1fr);gap:10px}.card{padding:14px 12px;min-height:160px}.header h1{font-size:1.3rem}}
+</style>
+</head>
+<body>
+<div class="header">
+<h1>🌍 ПОГОДА В СТОЛИЦАХ МИРА</h1>
+<p>НАЙДИ СТОЛИЦУ И УЗНАЙ ПОГОДУ!</p>
+</div>
+<div class="search-wrap">
+<input type="text" id="search" placeholder="🔍 ВВЕДИ НАЗВАНИЕ СТОЛИЦЫ..." autocomplete="off">
+<div class="autocomplete" id="ac"></div>
+</div>
+<div class="grid" id="grid"></div>
+<div class="empty" id="empty">ДОБАВЬ ПЕРВУЮ СТОЛИЦУ!<br>🌎🌍🌏</div>
+<script>
+const GRADIENTS=["linear-gradient(135deg,#667eea,#764ba2)","linear-gradient(135deg,#f093fb,#f5576c)","linear-gradient(135deg,#4facfe,#00f2fe)","linear-gradient(135deg,#43e97b,#38f9d7)","linear-gradient(135deg,#fa709a,#fee140)","linear-gradient(135deg,#a18cd1,#fbc2eb)","linear-gradient(135deg,#fccb90,#d57eeb)","linear-gradient(135deg,#e0c3fc,#8ec5fc)","linear-gradient(135deg,#ff9a9e,#fecfef)","linear-gradient(135deg,#ffecd2,#fcb69f)","linear-gradient(135deg,#a1c4fd,#c2e9fb)","linear-gradient(135deg,#d4fc79,#96e6a1)"];
+const WMO={0:"☀️ ЯСНО",1:"🌤 МАЛООБЛАЧНО",2:"⛅ ПЕРЕМЕННАЯ ОБЛАЧНОСТЬ",3:"☁️ ОБЛАЧНО",45:"🌫 ТУМАН",48:"🌫 ИЗМОРОЗЬ",51:"🌦 МОРОСЬ",53:"🌦 МОРОСЬ",55:"🌦 СИЛЬНАЯ МОРОСЬ",56:"🌧 ЛЕДЯНАЯ МОРОСЬ",57:"🌧 ЛЕДЯНАЯ МОРОСЬ",61:"🌧 НЕБОЛЬШОЙ ДОЖДЬ",63:"🌧 ДОЖДЬ",65:"🌧 СИЛЬНЫЙ ДОЖДЬ",66:"🌧 ЛЕДЯНОЙ ДОЖДЬ",67:"🌧 ЛЕДЯНОЙ ДОЖДЬ",71:"🌨 НЕБОЛЬШОЙ СНЕГ",73:"🌨 СНЕГ",75:"🌨 СИЛЬНЫЙ СНЕГ",77:"🌨 СНЕЖНЫЕ ЗЁРНА",80:"🌦 ЛИВЕНЬ",81:"🌦 СИЛЬНЫЙ ЛИВЕНЬ",82:"🌦 ОЧЕНЬ СИЛЬНЫЙ ЛИВЕНЬ",85:"🌨 СНЕГОПАД",86:"🌨 СИЛЬНЫЙ СНЕГОПАД",95:"⛈ ГРОЗА",96:"⛈ ГРОЗА С ГРАДОМ",99:"⛈ СИЛЬНАЯ ГРОЗА"};
+const CAPITALS=[
+{country:"АФГАНИСТАН",capital:"КАБУЛ",flag:"🇦🇫",lat:34.53,lon:69.17},
+{country:"АЛБАНИЯ",capital:"ТИРАНА",flag:"🇦🇱",lat:41.33,lon:19.82},
+{country:"АЛЖИР",capital:"АЛЖИР",flag:"🇩🇿",lat:36.75,lon:3.04},
+{country:"АНДОРРА",capital:"АНДОРРА-ЛА-ВЕЛЬЯ",flag:"🇦🇩",lat:42.51,lon:1.52},
+{country:"АНГОЛА",capital:"ЛУАНДА",flag:"🇦🇴",lat:-8.84,lon:13.23},
+{country:"АНТИГУА И БАРБУДА",capital:"СЕНТ-ДЖОНС",flag:"🇦🇬",lat:17.12,lon:-61.85},
+{country:"АРГЕНТИНА",capital:"БУЭНОС-АЙРЕС",flag:"🇦🇷",lat:-34.6,lon:-58.38},
+{country:"АРМЕНИЯ",capital:"ЕРЕВАН",flag:"🇦🇲",lat:40.18,lon:44.51},
+{country:"АВСТРАЛИЯ",capital:"КАНБЕРРА",flag:"🇦🇺",lat:-35.28,lon:149.13},
+{country:"АВСТРИЯ",capital:"ВЕНА",flag:"🇦🇹",lat:48.21,lon:16.37},
+{country:"АЗЕРБАЙДЖАН",capital:"БАКУ",flag:"🇦🇿",lat:40.41,lon:49.87},
+{country:"БАГАМЫ",capital:"НАССАУ",flag:"🇧🇸",lat:25.06,lon:-77.35},
+{country:"БАХРЕЙН",capital:"МАНАМА",flag:"🇧🇭",lat:26.23,lon:50.59},
+{country:"БАНГЛАДЕШ",capital:"ДАККА",flag:"🇧🇩",lat:23.81,lon:90.41},
+{country:"БАРБАДОС",capital:"БРИДЖТАУН",flag:"🇧🇧",lat:13.1,lon:-59.61},
+{country:"БЕЛАРУСЬ",capital:"МИНСК",flag:"🇧🇾",lat:53.9,lon:27.57},
+{country:"БЕЛЬГИЯ",capital:"БРЮССЕЛЬ",flag:"🇧🇪",lat:50.85,lon:4.35},
+{country:"БЕЛИЗ",capital:"БЕЛЬМОПАН",flag:"🇧🇿",lat:17.25,lon:-88.77},
+{country:"БЕНИН",capital:"ПОРТО-НОВО",flag:"🇧🇯",lat:6.5,lon:2.63},
+{country:"БУТАН",capital:"ТХИМПХУ",flag:"🇧🇹",lat:27.47,lon:89.64},
+{country:"БОЛИВИЯ",capital:"СУКРЕ",flag:"🇧🇴",lat:-19.04,lon:-65.26},
+{country:"БОСНИЯ И ГЕРЦЕГОВИНА",capital:"САРАЕВО",flag:"🇧🇦",lat:43.86,lon:18.41},
+{country:"БОТСВАНА",capital:"ГАБОРОНЕ",flag:"🇧🇼",lat:-24.65,lon:25.91},
+{country:"БРАЗИЛИЯ",capital:"БРАЗИЛИА",flag:"🇧🇷",lat:-15.79,lon:-47.88},
+{country:"БРУНЕЙ",capital:"БАНДАР-СЕРИ-БЕГАВАН",flag:"🇧🇳",lat:4.94,lon:114.95},
+{country:"БОЛГАРИЯ",capital:"СОФИЯ",flag:"🇧🇬",lat:42.7,lon:23.32},
+{country:"БУРКИНА-ФАСО",capital:"УАГАДУГУ",flag:"🇧🇫",lat:12.37,lon:-1.52},
+{country:"БУРУНДИ",capital:"ГИТЕГА",flag:"🇧🇮",lat:-3.43,lon:29.93},
+{country:"КАБО-ВЕРДЕ",capital:"ПРАЯ",flag:"🇨🇻",lat:14.93,lon:-23.51},
+{country:"КАМБОДЖА",capital:"ПНОМПЕНЬ",flag:"🇰🇭",lat:11.56,lon:104.92},
+{country:"КАМЕРУН",capital:"ЯУНДЕ",flag:"🇨🇲",lat:3.87,lon:11.52},
+{country:"КАНАДА",capital:"ОТТАВА",flag:"🇨🇦",lat:45.42,lon:-75.7},
+{country:"ЦАР",capital:"БАНГИ",flag:"🇨🇫",lat:4.36,lon:18.56},
+{country:"ЧАД",capital:"НДЖАМЕНА",flag:"🇹🇩",lat:12.13,lon:15.05},
+{country:"ЧИЛИ",capital:"САНТЬЯГО",flag:"🇨🇱",lat:-33.45,lon:-70.67},
+{country:"КИТАЙ",capital:"ПЕКИН",flag:"🇨🇳",lat:39.9,lon:116.41},
+{country:"КОЛУМБИЯ",capital:"БОГОТА",flag:"🇨🇴",lat:4.71,lon:-74.07},
+{country:"КОМОРЫ",capital:"МОРОНИ",flag:"🇰🇲",lat:-11.7,lon:43.26},
+{country:"КОНГО",capital:"БРАЗЗАВИЛЬ",flag:"🇨🇬",lat:-4.27,lon:15.28},
+{country:"ДР КОНГО",capital:"КИНШАСА",flag:"🇨🇩",lat:-4.32,lon:15.31},
+{country:"КОСТА-РИКА",capital:"САН-ХОСЕ",flag:"🇨🇷",lat:9.93,lon:-84.08},
+{country:"ХОРВАТИЯ",capital:"ЗАГРЕБ",flag:"🇭🇷",lat:45.81,lon:15.98},
+{country:"КУБА",capital:"ГАВАНА",flag:"🇨🇺",lat:23.11,lon:-82.37},
+{country:"КИПР",capital:"НИКОСИЯ",flag:"🇨🇾",lat:35.17,lon:33.37},
+{country:"ЧЕХИЯ",capital:"ПРАГА",flag:"🇨🇿",lat:50.08,lon:14.44},
+{country:"ДАНИЯ",capital:"КОПЕНГАГЕН",flag:"🇩🇰",lat:55.68,lon:12.57},
+{country:"ДЖИБУТИ",capital:"ДЖИБУТИ",flag:"🇩🇯",lat:11.59,lon:43.15},
+{country:"ДОМИНИКА",capital:"РОЗО",flag:"🇩🇲",lat:15.3,lon:-61.39},
+{country:"ДОМИНИКАНА",capital:"САНТО-ДОМИНГО",flag:"🇩🇴",lat:18.47,lon:-69.9},
+{country:"ЭКВАДОР",capital:"КИТО",flag:"🇪🇨",lat:-0.18,lon:-78.47},
+{country:"ЕГИПЕТ",capital:"КАИР",flag:"🇪🇬",lat:30.04,lon:31.24},
+{country:"САЛЬВАДОР",capital:"САН-САЛЬВАДОР",flag:"🇸🇻",lat:13.69,lon:-89.19},
+{country:"ЭКВАТОРИАЛЬНАЯ ГВИНЕЯ",capital:"МАЛАБО",flag:"🇬🇶",lat:3.75,lon:8.78},
+{country:"ЭРИТРЕЯ",capital:"АСМЭРА",flag:"🇪🇷",lat:15.34,lon:38.93},
+{country:"ЭСТОНИЯ",capital:"ТАЛЛИН",flag:"🇪🇪",lat:59.44,lon:24.75},
+{country:"ЭСВАТИНИ",capital:"МБАБАНЕ",flag:"🇸🇿",lat:-26.32,lon:31.13},
+{country:"ЭФИОПИЯ",capital:"АДДИС-АБЕБА",flag:"🇪🇹",lat:9.02,lon:38.75},
+{country:"ФИДЖИ",capital:"СУВА",flag:"🇫🇯",lat:-18.14,lon:178.44},
+{country:"ФИНЛЯНДИЯ",capital:"ХЕЛЬСИНКИ",flag:"🇫🇮",lat:60.17,lon:24.94},
+{country:"ФРАНЦИЯ",capital:"ПАРИЖ",flag:"🇫🇷",lat:48.86,lon:2.35},
+{country:"ГАБОН",capital:"ЛИБРЕВИЛЬ",flag:"🇬🇦",lat:0.39,lon:9.45},
+{country:"ГАМБИЯ",capital:"БАНЖУЛ",flag:"🇬🇲",lat:13.45,lon:-16.58},
+{country:"ГРУЗИЯ",capital:"ТБИЛИСИ",flag:"🇬🇪",lat:41.72,lon:44.78},
+{country:"ГЕРМАНИЯ",capital:"БЕРЛИН",flag:"🇩🇪",lat:52.52,lon:13.41},
+{country:"ГАНА",capital:"АККРА",flag:"🇬🇭",lat:5.56,lon:-0.19},
+{country:"ГРЕЦИЯ",capital:"АФИНЫ",flag:"🇬🇷",lat:37.98,lon:23.73},
+{country:"ГРЕНАДА",capital:"СЕНТ-ДЖОРДЖЕС",flag:"🇬🇩",lat:12.06,lon:-61.75},
+{country:"ГВАТЕМАЛА",capital:"ГВАТЕМАЛА",flag:"🇬🇹",lat:14.63,lon:-90.51},
+{country:"ГВИНЕЯ",capital:"КОНАКРИ",flag:"🇬🇳",lat:9.64,lon:-13.58},
+{country:"ГВИНЕЯ-БИСАУ",capital:"БИСАУ",flag:"🇬🇼",lat:11.86,lon:-15.6},
+{country:"ГАЙАНА",capital:"ДЖОРДЖТАУН",flag:"🇬🇾",lat:6.8,lon:-58.16},
+{country:"ГАИТИ",capital:"ПОРТ-О-ПРЕНС",flag:"🇭🇹",lat:18.54,lon:-72.34},
+{country:"ГОНДУРАС",capital:"ТЕГУСИГАЛЬПА",flag:"🇭🇳",lat:14.07,lon:-87.19},
+{country:"ВЕНГРИЯ",capital:"БУДАПЕШТ",flag:"🇭🇺",lat:47.5,lon:19.04},
+{country:"ИСЛАНДИЯ",capital:"РЕЙКЬЯВИК",flag:"🇮🇸",lat:64.15,lon:-21.94},
+{country:"ИНДИЯ",capital:"НЬЮ-ДЕЛИ",flag:"🇮🇳",lat:28.61,lon:77.21},
+{country:"ИНДОНЕЗИЯ",capital:"ДЖАКАРТА",flag:"🇮🇩",lat:-6.21,lon:106.85},
+{country:"ИРАН",capital:"ТЕГЕРАН",flag:"🇮🇷",lat:35.69,lon:51.39},
+{country:"ИРАК",capital:"БАГДАД",flag:"🇮🇶",lat:33.31,lon:44.37},
+{country:"ИРЛАНДИЯ",capital:"ДУБЛИН",flag:"🇮🇪",lat:53.35,lon:-6.26},
+{country:"ИЗРАИЛЬ",capital:"ИЕРУСАЛИМ",flag:"🇮🇱",lat:31.77,lon:35.23},
+{country:"ИТАЛИЯ",capital:"РИМ",flag:"🇮🇹",lat:41.9,lon:12.5},
+{country:"КОТ-Д'ИВУАР",capital:"ЯМУСУКРО",flag:"🇨🇮",lat:6.83,lon:-5.28},
+{country:"ЯМАЙКА",capital:"КИНГСТОН",flag:"🇯🇲",lat:18.0,lon:-76.79},
+{country:"ЯПОНИЯ",capital:"ТОКИО",flag:"🇯🇵",lat:35.68,lon:139.69},
+{country:"ИОРДАНИЯ",capital:"АММАН",flag:"🇯🇴",lat:31.95,lon:35.93},
+{country:"КАЗАХСТАН",capital:"АСТАНА",flag:"🇰🇿",lat:51.17,lon:71.43},
+{country:"КЕНИЯ",capital:"НАЙРОБИ",flag:"🇰🇪",lat:-1.29,lon:36.82},
+{country:"КИРИБАТИ",capital:"ТАРАВА",flag:"🇰🇮",lat:1.45,lon:173.0},
+{country:"КУВЕЙТ",capital:"ЭЛЬ-КУВЕЙТ",flag:"🇰🇼",lat:29.38,lon:47.99},
+{country:"КИРГИЗИЯ",capital:"БИШКЕК",flag:"🇰🇬",lat:42.87,lon:74.59},
+{country:"ЛАОС",capital:"ВЬЕНТЬЯН",flag:"🇱🇦",lat:17.97,lon:102.63},
+{country:"ЛАТВИЯ",capital:"РИГА",flag:"🇱🇻",lat:56.95,lon:24.11},
+{country:"ЛИВАН",capital:"БЕЙРУТ",flag:"🇱🇧",lat:33.89,lon:35.5},
+{country:"ЛЕСОТО",capital:"МАСЕРУ",flag:"🇱🇸",lat:-29.31,lon:27.48},
+{country:"ЛИБЕРИЯ",capital:"МОНРОВИЯ",flag:"🇱🇷",lat:6.3,lon:-10.8},
+{country:"ЛИВИЯ",capital:"ТРИПОЛИ",flag:"🇱🇾",lat:32.9,lon:13.18},
+{country:"ЛИХТЕНШТЕЙН",capital:"ВАДУЦ",flag:"🇱🇮",lat:47.14,lon:9.52},
+{country:"ЛИТВА",capital:"ВИЛЬНЮС",flag:"🇱🇹",lat:54.69,lon:25.28},
+{country:"ЛЮКСЕМБУРГ",capital:"ЛЮКСЕМБУРГ",flag:"🇱🇺",lat:49.61,lon:6.13},
+{country:"МАДАГАСКАР",capital:"АНТАНАНАРИВУ",flag:"🇲🇬",lat:-18.88,lon:47.51},
+{country:"МАЛАВИ",capital:"ЛИЛОНГВЕ",flag:"🇲🇼",lat:-13.97,lon:33.79},
+{country:"МАЛАЙЗИЯ",capital:"КУАЛА-ЛУМПУР",flag:"🇲🇾",lat:3.14,lon:101.69},
+{country:"МАЛЬДИВЫ",capital:"МАЛЕ",flag:"🇲🇻",lat:4.17,lon:73.51},
+{country:"МАЛИ",capital:"БАМАКО",flag:"🇲🇱",lat:12.64,lon:-8.0},
+{country:"МАЛЬТА",capital:"ВАЛЛЕТТА",flag:"🇲🇹",lat:35.9,lon:14.51},
+{country:"МАРШАЛЛОВЫ ОСТРОВА",capital:"МАДЖУРО",flag:"🇲🇭",lat:7.09,lon:171.38},
+{country:"МАВРИТАНИЯ",capital:"НУАКШОТ",flag:"🇲🇷",lat:18.09,lon:-15.98},
+{country:"МАВРИКИЙ",capital:"ПОРТ-ЛУИС",flag:"🇲🇺",lat:-20.16,lon:57.5},
+{country:"МЕКСИКА",capital:"МЕХИКО",flag:"🇲🇽",lat:19.43,lon:-99.13},
+{country:"МИКРОНЕЗИЯ",capital:"ПАЛИКИР",flag:"🇫🇲",lat:6.92,lon:158.15},
+{country:"МОЛДОВА",capital:"КИШИНЁВ",flag:"🇲🇩",lat:47.01,lon:28.86},
+{country:"МОНАКО",capital:"МОНАКО",flag:"🇲🇨",lat:43.73,lon:7.42},
+{country:"МОНГОЛИЯ",capital:"УЛАН-БАТОР",flag:"🇲🇳",lat:47.91,lon:106.91},
+{country:"ЧЕРНОГОРИЯ",capital:"ПОДГОРИЦА",flag:"🇲🇪",lat:42.44,lon:19.26},
+{country:"МАРОККО",capital:"РАБАТ",flag:"🇲🇦",lat:34.02,lon:-6.84},
+{country:"МОЗАМБИК",capital:"МАПУТУ",flag:"🇲🇿",lat:-25.97,lon:32.57},
+{country:"МЬЯНМА",capital:"НЕЙПЬИДО",flag:"🇲🇲",lat:19.76,lon:96.07},
+{country:"НАМИБИЯ",capital:"ВИНДХУК",flag:"🇳🇦",lat:-22.56,lon:17.08},
+{country:"НАУРУ",capital:"ЯРЕН",flag:"🇳🇷",lat:-0.55,lon:166.92},
+{country:"НЕПАЛ",capital:"КАТМАНДУ",flag:"🇳🇵",lat:27.72,lon:85.32},
+{country:"НИДЕРЛАНДЫ",capital:"АМСТЕРДАМ",flag:"🇳🇱",lat:52.37,lon:4.9},
+{country:"НОВАЯ ЗЕЛАНДИЯ",capital:"ВЕЛЛИНГТОН",flag:"🇳🇿",lat:-41.29,lon:174.78},
+{country:"НИКАРАГУА",capital:"МАНАГУА",flag:"🇳🇮",lat:12.15,lon:-86.27},
+{country:"НИГЕР",capital:"НИАМЕЙ",flag:"🇳🇪",lat:13.51,lon:2.13},
+{country:"НИГЕРИЯ",capital:"АБУДЖА",flag:"🇳🇬",lat:9.06,lon:7.49},
+{country:"СЕВЕРНАЯ КОРЕЯ",capital:"ПХЕНЬЯН",flag:"🇰🇵",lat:39.02,lon:125.75},
+{country:"СЕВЕРНАЯ МАКЕДОНИЯ",capital:"СКОПЬЕ",flag:"🇲🇰",lat:42.0,lon:21.43},
+{country:"НОРВЕГИЯ",capital:"ОСЛО",flag:"🇳🇴",lat:59.91,lon:10.75},
+{country:"ОМАН",capital:"МАСКАТ",flag:"🇴🇲",lat:23.59,lon:58.54},
+{country:"ПАКИСТАН",capital:"ИСЛАМАБАД",flag:"🇵🇰",lat:33.69,lon:73.04},
+{country:"ПАЛАУ",capital:"НГЕРУЛМУД",flag:"🇵🇼",lat:7.5,lon:134.62},
+{country:"ПАНАМА",capital:"ПАНАМА",flag:"🇵🇦",lat:8.98,lon:-79.52},
+{country:"ПАПУА — НОВАЯ ГВИНЕЯ",capital:"ПОРТ-МОРСБИ",flag:"🇵🇬",lat:-6.21,lon:155.0},
+{country:"ПАРАГВАЙ",capital:"АСУНСЬОН",flag:"🇵🇾",lat:-25.26,lon:-57.58},
+{country:"ПЕРУ",capital:"ЛИМА",flag:"🇵🇪",lat:-12.05,lon:-77.04},
+{country:"ФИЛИППИНЫ",capital:"МАНИЛА",flag:"🇵🇭",lat:14.6,lon:120.98},
+{country:"ПОЛЬША",capital:"ВАРШАВА",flag:"🇵🇱",lat:52.23,lon:21.01},
+{country:"ПОРТУГАЛИЯ",capital:"ЛИССАБОН",flag:"🇵🇹",lat:38.72,lon:-9.14},
+{country:"КАТАР",capital:"ДОХА",flag:"🇶🇦",lat:25.29,lon:51.53},
+{country:"РУМЫНИЯ",capital:"БУХАРЕСТ",flag:"🇷🇴",lat:44.43,lon:26.1},
+{country:"РОССИЯ",capital:"МОСКВА",flag:"🇷🇺",lat:55.76,lon:37.62},
+{country:"РУАНДА",capital:"КИГАЛИ",flag:"🇷🇼",lat:-1.94,lon:30.06},
+{country:"СЕНТ-КИТС И НЕВИС",capital:"БАСТЕР",flag:"🇰🇳",lat:17.3,lon:-62.73},
+{country:"СЕНТ-ЛЮСИЯ",capital:"КАСТРИ",flag:"🇱🇨",lat:14.01,lon:-61.0},
+{country:"СЕНТ-ВИНСЕНТ И ГРЕНАДИНЫ",capital:"КИНГСТАУН",flag:"🇻🇨",lat:13.16,lon:-61.23},
+{country:"САМОА",capital:"АПИА",flag:"🇼🇸",lat:-13.83,lon:-171.76},
+{country:"САН-МАРИНО",capital:"САН-МАРИНО",flag:"🇸🇲",lat:43.94,lon:12.45},
+{country:"САН-ТОМЕ И ПРИНСИПИ",capital:"САН-ТОМЕ",flag:"🇸🇹",lat:0.34,lon:6.73},
+{country:"САУДОВСКАЯ АРАВИЯ",capital:"ЭР-РИЯД",flag:"🇸🇦",lat:24.69,lon:46.72},
+{country:"СЕНЕГАЛ",capital:"ДАКАР",flag:"🇸🇳",lat:14.72,lon:-17.47},
+{country:"СЕРБИЯ",capital:"БЕЛГРАД",flag:"🇷🇸",lat:44.79,lon:20.47},
+{country:"СЕЙШЕЛЫ",capital:"ВИКТОРИЯ",flag:"🇸🇨",lat:-4.62,lon:55.45},
+{country:"СЬЕРРА-ЛЕОНЕ",capital:"ФРИТАУН",flag:"🇸🇱",lat:8.48,lon:-13.23},
+{country:"СИНГАПУР",capital:"СИНГАПУР",flag:"🇸🇬",lat:1.35,lon:103.82},
+{country:"СЛОВАКИЯ",capital:"БРАТИСЛАВА",flag:"🇸🇰",lat:48.15,lon:17.11},
+{country:"СЛОВЕНИЯ",capital:"ЛЮБЛЯНА",flag:"🇸🇮",lat:46.06,lon:14.51},
+{country:"СОЛОМОНОВЫ ОСТРОВА",capital:"ХОНИАРА",flag:"🇸🇧",lat:-9.43,lon:159.96},
+{country:"СОМАЛИ",capital:"МОГАДИШО",flag:"🇸🇴",lat:2.05,lon:45.34},
+{country:"ЮАР",capital:"ПРЕТОРИЯ",flag:"🇿🇦",lat:-25.75,lon:28.19},
+{country:"ЮЖНАЯ КОРЕЯ",capital:"СЕУЛ",flag:"🇰🇷",lat:37.57,lon:126.98},
+{country:"ЮЖНЫЙ СУДАН",capital:"ДЖУБА",flag:"🇸🇸",lat:4.85,lon:31.58},
+{country:"ИСПАНИЯ",capital:"МАДРИД",flag:"🇪🇸",lat:40.42,lon:-3.7},
+{country:"ШРИ-ЛАНКА",capital:"КОЛОМБО",flag:"🇱🇰",lat:6.93,lon:79.85},
+{country:"СУДАН",capital:"ХАРТУМ",flag:"🇸🇩",lat:15.59,lon:32.53},
+{country:"СУРИНАМ",capital:"ПАРАМАРИБО",flag:"🇸🇷",lat:5.87,lon:-55.17},
+{country:"ШВЕЦИЯ",capital:"СТОКГОЛЬМ",flag:"🇸🇪",lat:59.33,lon:18.07},
+{country:"ШВЕЙЦАРИЯ",capital:"БЕРН",flag:"🇨🇭",lat:46.95,lon:7.45},
+{country:"СИРИЯ",capital:"ДАМАСК",flag:"🇸🇾",lat:33.51,lon:36.29},
+{country:"ТАЙВАНЬ",capital:"ТАЙБЭЙ",flag:"🇹🇼",lat:25.03,lon:121.57},
+{country:"ТАДЖИКИСТАН",capital:"ДУШАНБЕ",flag:"🇹🇯",lat:38.56,lon:68.77},
+{country:"ТАНЗАНИЯ",capital:"ДОДОМА",flag:"🇹🇿",lat:-6.16,lon:35.75},
+{country:"ТАИЛАНД",capital:"БАНГКОК",flag:"🇹🇭",lat:13.76,lon:100.5},
+{country:"ТОГО",capital:"ЛОМЕ",flag:"🇹🇬",lat:6.17,lon:1.23},
+{country:"ТОНГА",capital:"НУКУАЛОФА",flag:"🇹🇴",lat:-21.21,lon:-175.2},
+{country:"ТРИНИДАД И ТОБАГО",capital:"ПОРТ-ОФ-СПЕЙН",flag:"🇹🇹",lat:10.66,lon:-61.51},
+{country:"ТУНИС",capital:"ТУНИС",flag:"🇹🇳",lat:36.81,lon:10.18},
+{country:"ТУРЦИЯ",capital:"АНКАРА",flag:"🇹🇷",lat:39.93,lon:32.86},
+{country:"ТУРКМЕНИСТАН",capital:"АШХАБАД",flag:"🇹🇲",lat:37.95,lon:58.38},
+{country:"ТУВАЛУ",capital:"ФУНАФУТИ",flag:"🇹🇻",lat:-8.52,lon:179.2},
+{country:"УГАНДА",capital:"КАМПАЛА",flag:"🇺🇬",lat:0.31,lon:32.58},
+{country:"УКРАИНА",capital:"КИЕВ",flag:"🇺🇦",lat:50.45,lon:30.52},
+{country:"ОАЭ",capital:"АБУ-ДАБИ",flag:"🇦🇪",lat:24.45,lon:54.65},
+{country:"ВЕЛИКОБРИТАНИЯ",capital:"ЛОНДОН",flag:"🇬🇧",lat:51.51,lon:-0.13},
+{country:"США",capital:"ВАШИНГТОН",flag:"🇺🇸",lat:38.91,lon:-77.04},
+{country:"УРУГВАЙ",capital:"МОНТЕВИДЕО",flag:"🇺🇾",lat:-34.88,lon:-56.17},
+{country:"УЗБЕКИСТАН",capital:"ТАШКЕНТ",flag:"🇺🇿",lat:41.3,lon:69.28},
+{country:"ВАНУАТУ",capital:"ПОРТ-ВИЛА",flag:"🇻🇺",lat:-17.73,lon:168.32},
+{country:"ВАТИКАН",capital:"ВАТИКАН",flag:"🇻🇦",lat:41.9,lon:12.45},
+{country:"ВЕНЕСУЭЛА",capital:"КАРАКАС",flag:"🇻🇪",lat:10.49,lon:-66.88},
+{country:"ВЬЕТНАМ",capital:"ХАНОЙ",flag:"🇻🇳",lat:21.03,lon:105.85},
+{country:"ЙЕМЕН",capital:"САНА",flag:"🇾🇪",lat:15.37,lon:44.19},
+{country:"ЗАМБИЯ",capital:"ЛУСАКА",flag:"🇿🇲",lat:-15.39,lon:28.32},
+{country:"ЗИМБАБВЕ",capital:"ХАРАРЕ",flag:"🇿🇼",lat:-17.83,lon:31.05},
+{country:"ВОСТОЧНЫЙ ТИМОР",capital:"ДИЛИ",flag:"🇹🇱",lat:-8.56,lon:125.57},
+{country:"ПАЛЕСТИНА",capital:"РАМАЛЛА",flag:"🇵🇸",lat:31.9,lon:35.2},
+{country:"КОСОВО",capital:"ПРИШТИНА",flag:"🇽🇰",lat:42.66,lon:21.17}
+];
+
+const grid=document.getElementById('grid');
+const empty=document.getElementById('empty');
+const search=document.getElementById('search');
+const ac=document.getElementById('ac');
+let saved=JSON.parse(localStorage.getItem('caps')||'[]');
+let acIdx=-1;
+
+function getGrad(i){return GRADIENTS[i%GRADIENTS.length]}
+
+function renderCards(){
+  grid.innerHTML='';
+  empty.style.display=saved.length?'none':'block';
+  saved.forEach((key,i)=>{
+    const c=CAPITALS.find(x=>x.capital===key);if(!c)return;
+    const card=document.createElement('div');
+    card.className='card';
+    card.style.background=getGrad(i);
+    card.innerHTML=`<div><div class="flag">${c.flag}</div><div class="country">${c.country}</div><div class="capital">${c.capital}</div></div><div class="weather-icon loading" id="w-${i}">ЗАГРУЗКА...</div><button class="remove" title="УБРАТЬ">✕</button>`;
+    card.querySelector('.remove').onclick=()=>{saved=saved.filter(x=>x!==key);localStorage.setItem('caps',JSON.stringify(saved));renderCards()};
+    grid.appendChild(card);
+    fetchWeather(c,i);
+  });
+}
+
+async function fetchWeather(c,i){
+  try{
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&current_weather=true`);
+    const d=await r.json();
+    const w=d.current_weather;
+    const el=document.getElementById('w-'+i);if(!el)return;
+    const desc=WMO[w.weathercode]||'🌡 НЕТ ДАННЫХ';
+    const icon=desc.split(' ')[0];
+    const cond=desc.split(' ').slice(1).join(' ');
+    const temp=Math.round(w.temperature);
+    el.classList.remove('loading');
+    el.innerHTML=`<div class="weather-icon">${icon}</div><div class="temp">${temp>0?'+':''}${temp}°C</div><div class="condition">${cond}</div>`;
+  }catch(e){
+    const el=document.getElementById('w-'+i);if(el){el.classList.remove('loading');el.textContent='⚠️ ОШИБКА';}
+  }
+}
+
+function showAC(q){
+  if(!q){ac.style.display='none';acIdx=-1;return}
+  const res=CAPITALS.filter(c=>!saved.includes(c.capital)&&(c.capital.includes(q)||c.country.includes(q))).slice(0,8);
+  if(!res.length){ac.style.display='none';acIdx=-1;return}
+  ac.innerHTML=res.map((c,i)=>`<div class="item" data-key="${c.capital}"><span class="flag">${c.flag}</span><span class="info"><span>${c.capital}</span><span class="cap">${c.country}</span></span></div>`).join('');
+  ac.style.display='block';acIdx=-1;
+  ac.querySelectorAll('.item').forEach(el=>{el.onclick=()=>addCap(el.dataset.key)});
+}
+
+function addCap(key){
+  if(!saved.includes(key)){saved.push(key);localStorage.setItem('caps',JSON.stringify(saved))}
+  search.value='';ac.style.display='none';acIdx=-1;renderCards();
+}
+
+search.addEventListener('input',()=>showAC(search.value.toUpperCase()));
+search.addEventListener('keydown',e=>{
+  const items=ac.querySelectorAll('.item');
+  if(e.key==='ArrowDown'){e.preventDefault();acIdx=Math.min(acIdx+1,items.length-1);items.forEach((el,i)=>el.classList.toggle('active',i===acIdx))}
+  else if(e.key==='ArrowUp'){e.preventDefault();acIdx=Math.max(acIdx-1,0);items.forEach((el,i)=>el.classList.toggle('active',i===acIdx))}
+  else if(e.key==='Enter'&&acIdx>=0&&items[acIdx]){addCap(items[acIdx].dataset.key)}
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))ac.style.display='none'});
+
+// Start with some fun defaults if empty
+if(!saved.length){saved=["МОСКВА","ТОКИО","ПАРИЖ","ВАШИНГТОН","ПЕКИН"];localStorage.setItem('caps',JSON.stringify(saved))}
+renderCards();
+</script>
+</body>
+</html>
